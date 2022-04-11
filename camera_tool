@@ -1,0 +1,117 @@
+#!/usr/bin/env python3
+"""
+Author : jim <jim@localhost>
+Date   : 2022-04-06
+Purpose: Take pictures with USB camera
+"""
+
+import argparse
+from typing import NamedTuple, TextIO
+
+import os
+import numpy as np
+import cv2
+import imutils
+import time
+
+
+
+class Args(NamedTuple):
+    """ Command-line arguments """
+    directory: dir
+    interval: int
+    duration: int
+    test: bool
+
+# --------------------------------------------------
+def get_args() -> Args:
+    """ Get command-line arguments """
+
+    parser = argparse.ArgumentParser(
+        description='Take and store USB images',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    parser.add_argument('directory',
+                        metavar='dir',
+                        help='Storage directory for output photos')
+
+    parser.add_argument('-i',
+                        '--interval',
+                        metavar='[int]',
+                        help='Interval in seconds',
+                        type=int,
+                        default=15)
+
+    parser.add_argument('-d',
+                        '--duration',
+                        metavar='[int]',
+                        help='Duration of time in seconds to take pictures',
+                        type=int,
+                        default=60)
+
+    parser.add_argument('--test',
+                        action='store_true',
+                        help='Runs the tool in test mode: Only takes one picture')
+                        
+
+    args = parser.parse_args()
+
+    return Args(args.directory, args.interval, args.duration, args.test)
+# -------------------------------------------------
+def takePicture(cap,storage):
+    """ Captures and saves a picture """
+    (grabbed, frame) = cap.read()
+    print(type(frame))
+    exit()
+    cv2.imwrite(storage, frame)
+    cap.release()
+    return
+
+'''CITATION:
+    Author:Luxato
+    Date:Apr 18, 2018
+    Program:Python3
+    Web address:https://gist.github.com/Luxato/384a7c8a6bfdeba09d54cb5bd6b2c9fb
+'''
+
+# --------------------------------------------------
+def main() -> None:
+    """ Main controls the tool """
+
+
+    #Get arguments from command line
+    args = get_args()
+    directory = args.directory
+    duration = args.duration
+    interval = args.interval
+    test = args.test
+
+
+    # Check if the input directory exists and creates it if it doesnt
+    if not os.path.isdir(directory):
+        os.mkdir(directory)
+
+    # Runs simpler function if test flag is raised
+    if test:
+        storage = directory + "/test_capture.png"
+        cap = cv2.VideoCapture(0)
+        takePicture(cap,storage)
+        print("Test capture stored in " + storage)
+        exit()
+
+    # Runs the take a picture function on loop according to Time length and interval
+    cycles = int(duration/interval)
+    print("The camera will take " + str(cycles) + " pictures")
+    for i in range(cycles):
+        cap = cv2.VideoCapture(0)
+        storage = directory + "/capture_" + str(i) + ".png"
+        print("Saving file to..." + storage)
+        takePicture(cap,storage)
+        if i != cycles:
+            time.sleep(interval)
+
+
+
+# --------------------------------------------------
+if __name__ == '__main__':
+    main()
