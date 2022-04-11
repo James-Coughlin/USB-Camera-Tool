@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
 Author : jim <jim@localhost>
-Date   : 2022-04-06
+Date   : 2022-04-11
 Purpose: Take pictures with USB camera
+Version: v0.2
 """
 
 import argparse
-from typing import NamedTuple, TextIO
-
+from typing import NamedTuple
 import os
 import numpy as np
 import cv2
@@ -22,6 +22,7 @@ class Args(NamedTuple):
     interval: int
     duration: int
     test: bool
+    verbosity: bool
 
 # --------------------------------------------------
 def get_args() -> Args:
@@ -53,64 +54,90 @@ def get_args() -> Args:
                         action='store_true',
                         help='Runs the tool in test mode: Only takes one picture')
                         
-
+    parser.add_argument('-v',
+                        '--verbosity',
+                        action='store_true',
+                        help='Runs the tools in verbose mode')
+    
     args = parser.parse_args()
 
-    return Args(args.directory, args.interval, args.duration, args.test)
-# -------------------------------------------------
-def takePicture(cap,storage):
-    """ Captures and saves a picture """
-    (grabbed, frame) = cap.read()
-    print(type(frame))
-    exit()
+    return Args(args.directory, args.interval, args.duration, args.test,args.verbosity)
+
+# --------------------------------------------------
+def captureLoop(directory, duration, interval,v):
+    ''' Defines the loop to take pictures '''
+    images = int(duration/interval)
+    pic_time = [x * interval for x in list(range(images))]
+    count = 0
+    img_num = 0
+    if v:
+        print(f"Taking {images} pictures")
+
+    cap = cv2.VideoCapture(0)
+    while True:
+        ret, frame = cap.read()
+        
+        if count == pic_time[img_num]:
+            grabbed, still = cap.read()
+            if v:
+                print(f"Capturing {img_num} image")
+            file_path = directory + "/capture_" + str(img_num) + ".png"
+            cv2.imwrite(file_path, still)
+
+            if img_num == (images - 1):
+                cap.release()
+                cv2.destroyAllWindows()
+                print("Successfully taken all pictures")
+                return
+            
+            img_num += 1
+        
+        # Wait 1 second and check conditions again
+        time.sleep(1)
+        count += 1
+
+# --------------------------------------------------
+def tests():
+    """ Runs Various test procedures """
+    if not os.path.isdir('temp'):
+        os.mkdir('temp')
+
+    storage = 'temp/test_capture.png'
+    
+    cap = cv2.VideoCapture(0)
+    ret, frame = cap.read()
     cv2.imwrite(storage, frame)
     cap.release()
-    return
-
-'''CITATION:
-    Author:Luxato
-    Date:Apr 18, 2018
-    Program:Python3
-    Web address:https://gist.github.com/Luxato/384a7c8a6bfdeba09d54cb5bd6b2c9fb
-'''
-
+    
+    print('Tests complete')
+    
+    exit()
 # --------------------------------------------------
 def main() -> None:
     """ Main controls the tool """
 
-
-    #Get arguments from command line
+    # Get arguments from command line
     args = get_args()
     directory = args.directory
     duration = args.duration
     interval = args.interval
     test = args.test
+    v = args.verbosity
 
-
-    # Check if the input directory exists and creates it if it doesnt
+    # Check for input directory
     if not os.path.isdir(directory):
         os.mkdir(directory)
 
-    # Runs simpler function if test flag is raised
+    # Test Mode 
     if test:
-        storage = directory + "/test_capture.png"
-        cap = cv2.VideoCapture(0)
-        takePicture(cap,storage)
-        print("Test capture stored in " + storage)
-        exit()
+        tests()
 
-    # Runs the take a picture function on loop according to Time length and interval
-    cycles = int(duration/interval)
-    print("The camera will take " + str(cycles) + " pictures")
-    for i in range(cycles):
-        cap = cv2.VideoCapture(0)
-        storage = directory + "/capture_" + str(i) + ".png"
-        print("Saving file to..." + storage)
-        takePicture(cap,storage)
-        if i != cycles:
-            time.sleep(interval)
+    # Picture Mode
+    if True:
+        print("Starting to take pictures...")
+        captureLoop(directory, duration, interval,v)
 
-
+    exit()
 
 # --------------------------------------------------
 if __name__ == '__main__':
