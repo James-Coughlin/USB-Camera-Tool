@@ -2,8 +2,8 @@
 """
 Author : jim <jim@localhost>
 Date   : 2022-04-27
-Purpose: Take pictures with USB camera
-Version: v0.4
+Purpose: Take pictures with USB cameras
+Version: v0.5
 """
 
 import argparse
@@ -13,8 +13,8 @@ import numpy as np
 import cv2
 import imutils
 import time
-
-
+import usb.core
+from threading import Thread
 
 class Args(NamedTuple):
     """ Command-line arguments """
@@ -25,6 +25,7 @@ class Args(NamedTuple):
     verbosity: bool
     video: bool
     videoFrames: int
+
 
 # --------------------------------------------------
 def get_args() -> Args:
@@ -78,15 +79,9 @@ def get_args() -> Args:
     return Args(args.directory, args.interval, args.duration, args.test, args.verbosity, args.videoMode, args.videoFrames)
 
 # --------------------------------------------------
-def captureLoop(directory, duration, interval,v):
+def captureLoop(directory, duration, interval,v, camera_index):
     ''' Defines the loop to take pictures '''
-    if not os.path.isdir(directory + "/camera_1"):
-        os.mkdir(directory + "/camera_1")
-
-    img_dir = directory + "/camera_1"
-
-
-
+    
     images = int(duration/interval)
     pic_time = [x * interval for x in list(range(images))]
     count = 0
@@ -102,13 +97,12 @@ def captureLoop(directory, duration, interval,v):
             grabbed, still = cap.read()
             if v:
                 print(f"Capturing {img_num} image")
-            file_path = img_dir + "/capture_" + str(img_num) + ".png"
+            file_path = directory + "/capture_" + str(img_num) + ".png"
             cv2.imwrite(file_path, still)
 
             if img_num == (images - 1):
                 cap.release()
                 cv2.destroyAllWindows()
-                print("Successfully taken all pictures")
                 return
             
             img_num += 1
@@ -150,23 +144,6 @@ def img2video(directory, camera, fps):
 
     print("The output video is {}".format(output))
 
-
-# --------------------------------------------------
-def tests():
-    """ Runs Various test procedures """
-    if not os.path.isdir('temp'):
-        os.mkdir('temp')
-
-    storage = 'temp/test_capture.png'
-    
-    cap = cv2.VideoCapture(0)
-    ret, frame = cap.read()
-    cv2.imwrite(storage, frame)
-    cap.release()
-    
-    print('Tests complete')
-    
-    exit()
 # --------------------------------------------------
 def main() -> None:
     """ Main controls the tool """
@@ -176,21 +153,43 @@ def main() -> None:
     directory = args.directory
     duration = args.duration
     interval = args.interval
-    test = args.test
     v = args.verbosity
-
-    # Check for input directory
+    
+    # Find the number of Cameras attached
+    cameras = usb.core.find(find_all=True,idVendor=0x32e4)
+    numCams = len(list(cameras))
+    
+    # Create main directory and sub directories for each camera
     if not os.path.isdir(directory):
         os.mkdir(directory)
+    for i in range(numCams):
+            if not os.path.isdir(directory + "/camera_" + str(i+1)):
+                    os.mkdir(directory + "/camera_" + str(i+1))
 
-    # Test Mode 
-    if test:
-        tests()
 
-    # Picture Mode
-    if True:
-        print("Starting to take pictures...")
-        captureLoop(directory, duration, interval,v)
+    # Create Threads for each camera to loop on
+    print("Starting to take pictures...")
+    threads = []
+
+
+    #   First Camera
+    img_dir_1 = directory + "/camera_1"
+    cam_1 = Thread(target=captureLoop,args=(img_dir_1, duration, interval, v, 0))
+    cam_1.start()
+    threads.append(cam_1)
+
+
+    #   Second Camera
+    if numCams > 1:
+        img_dir_2 = directory + "/camera_2"
+        cam_2 = Thread(target-captureLoop, args=(img_dir_1, duration, interval, v, 1))
+        cam_2.start()
+        threads.append(cam_2)
+
+    # Join threads
+    for i in threads:
+        i.join()
+
 
     # Time Lapse Mode
     if args.video:
