@@ -9,10 +9,10 @@ Version: v0.5
 import argparse
 from typing import NamedTuple
 import os
+import time
 import numpy as np
 import cv2
 import imutils
-import time
 import usb.core
 from threading import Thread
 
@@ -56,24 +56,24 @@ def get_args() -> Args:
     parser.add_argument('--test',
                         action='store_true',
                         help='Runs the tool in test mode: Only takes one picture')
-                        
+
     parser.add_argument('-v',
                         '--verbosity',
                         action='store_true',
                         help='Runs the tools in verbose mode')
-    
+
     parser.add_argument('-vm',
                         '--videoMode',
                         action='store_true',
                         help='Creates a timelapse from the captures')
-    
+
     parser.add_argument('-vf',
                         '--videoFrames',
                         metavar='FPS',
                         help='Frames per second for the timelapse',
                         type=int,
                         default=60)
-    
+
     args = parser.parse_args()
 
     return Args(args.directory, args.interval, args.duration, args.test, args.verbosity, args.videoMode, args.videoFrames)
@@ -81,7 +81,7 @@ def get_args() -> Args:
 # --------------------------------------------------
 def captureLoop(directory, duration, interval,v, camera_index):
     ''' Defines the loop to take pictures '''
-    
+
     images = int(duration/interval)
     pic_time = [x * interval for x in list(range(images))]
     count = 0
@@ -92,7 +92,7 @@ def captureLoop(directory, duration, interval,v, camera_index):
     cap = cv2.VideoCapture(0)
     while True:
         ret, frame = cap.read()
-        
+
         if count == pic_time[img_num]:
             grabbed, still = cap.read()
             if v:
@@ -104,9 +104,9 @@ def captureLoop(directory, duration, interval,v, camera_index):
                 cap.release()
                 cv2.destroyAllWindows()
                 return
-            
+
             img_num += 1
-        
+
         # Wait 1 second and check conditions again
         time.sleep(1)
         count += 1
@@ -121,7 +121,7 @@ def img2video(directory, camera, fps):
     for f in os.listdir():
         if f.endswith('.png'):
             images.append(f)
-    
+
     images.sort(key=lambda x: os.path.getmtime(x))
 
 
@@ -133,11 +133,11 @@ def img2video(directory, camera, fps):
     output = camera + "_video.mp4"
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(output, fourcc, fps, (width, height))
-    
+
     # Make the video
     for image in images:
         frame = cv2.imread(image)
-        out.write(frame)    
+        out.write(frame)
 
     out.release()
     cv2.destroyAllWindows()
@@ -154,17 +154,17 @@ def main() -> None:
     duration = args.duration
     interval = args.interval
     v = args.verbosity
-    
+
     # Find the number of Cameras attached
     cameras = usb.core.find(find_all=True,idVendor=0x32e4)
-    numCams = len(list(cameras))
-    
+    num_Cams = len(list(cameras))
+
     # Create main directory and sub directories for each camera
     if not os.path.isdir(directory):
         os.mkdir(directory)
-    for i in range(numCams):
-            if not os.path.isdir(directory + "/camera_" + str(i+1)):
-                    os.mkdir(directory + "/camera_" + str(i+1))
+    for i in range(num_Cams):
+        if not os.path.isdir(directory + "/camera_" + str(i+1)):
+            os.mkdir(directory + "/camera_" + str(i+1))
 
 
     # Create Threads for each camera to loop on
@@ -180,16 +180,16 @@ def main() -> None:
 
 
     #   Second Camera
-    if numCams > 1:
+    if num_Cams > 1:
         img_dir_2 = directory + "/camera_2"
-        cam_2 = Thread(target-captureLoop, args=(img_dir_1, duration, interval, v, 1))
+        cam_2 = Thread(target=captureLoop, args=(img_dir_1, duration, interval, v, 1))
         cam_2.start()
         threads.append(cam_2)
 
     # Join threads
     for i in threads:
         i.join()
-
+    print("All Pictures Taken")
 
     # Time Lapse Mode
     if args.video:
