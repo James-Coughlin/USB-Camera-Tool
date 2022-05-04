@@ -1,6 +1,6 @@
 # USB-Camera-Tool
 
-Software for using USB cameras attached to the Rocker Platform
+Software for using USB microscope cameras attached to the Rocker Platform
 
 ## Installation
 
