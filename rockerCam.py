@@ -28,23 +28,21 @@ def get_args() -> Args:
     """ Get command-line arguments """
 
     parser = argparse.ArgumentParser(
-        description='Take and store USB images',
+        description='Microscope camera tool to be used alongside Rocker Platform',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument('directory',
-                        metavar='dir',
-                        help='Storage directory for output photos')
+                        metavar='Folder',
+                        help='Main directory to store captured images')
 
     parser.add_argument('-i',
                         '--interval',
-                        metavar='[int]',
                         help='Interval in seconds',
                         type=int,
                         default=5)
 
     parser.add_argument('-d',
                         '--duration',
-                        metavar='[int]',
                         help='Duration of time in seconds to take pictures',
                         type=int,
                         default=15)
@@ -60,14 +58,18 @@ def get_args() -> Args:
 
     parser.add_argument('-vf',
                         '--videoFrames',
-                        metavar='FPS',
                         help='Frames per second for the timelapse',
                         type=int,
                         default=60)
 
     args = parser.parse_args()
 
-    return Args(args.directory, args.interval, args.duration, args.debug, args.videoMode, args.videoFrames)
+    return Args(args.directory,
+                args.interval,
+                args.duration,
+                args.debug,
+                args.videoMode,
+                args.videoFrames)
 
 # --------------------------------------------------
 def main() -> None:
@@ -80,20 +82,16 @@ def main() -> None:
     interval = args.interval
 
     # Find the number of Cameras attached
-    cameras = usb.core.find(find_all=True,idVendor=0x32e4)
-    num_Cams = len(list(cameras))
+    num_Cams = len(list(usb.core.find(find_all=True,idVendor=0x32e4)))
 
     # Create a main directory and sub directories for each camera
     if os.path.isdir(directory):
-        print("Directory already exists: Overwrite(Y/N)")
-        if input() == "Y":
-            pass
-        else:
-            exit()
+        print("Directory already exists: Exiting...")
+        exit()
     else:
         os.mkdir(directory)
         for i in range(num_Cams):
-            os.mkdir(directory + "/camera_" + str(i + 1))
+            os.mkdir(f"{directory}/camera_{str(i +1)}")
 
     # Function to open picture taking threads
     openCams(directory, num_Cams, duration, interval)
@@ -106,83 +104,47 @@ def main() -> None:
 
 # --------------------------------------------------
 def openCams(directory, num_Cams, duration, interval):
-    """ wrapper for capture loop """
+    """ Wrapper for capture loop """
     print("Starting to take pictures")
     threads = []
 
-    # First Camera
-    img_dir_1 = directory + "/camera_1"
-    cam1 = Thread(target=captureLoop, args=(img_dir_1, duration,interval, 0))
-    cam1.start()
-    threads.append(cam1)
-
-    # Second Camera
-    if num_Cams > 1:
-        img_dir_2 = directory + "/camera_2"
-        cam2 = Thread(target=captureLoop, args=(img_dir_2, duration,interval, 2))
-        cam2.start()
-        threads.append(cam2)
-
-    # Third Camera
-    if num_Cams > 2:
-        img_dir_3 = directory + "/camera_3"
-        cam3 = Thread(target=captureLoop, args=(img_dir_3, duration,interval, 4))
-        cam3.start()
-        threads.append(cam3)
-
-    # Fourth Camera
-    if num_Cams > 3:
-        img_dir_4 = directory + "/camera_4"
-        cam4 = Thread(target=captureLoop, args=(img_dir_4, duration,interval, 6))
-        cam4.start()
-        threads.append(cam4)
-
-    # Fifth Camera
-    if num_Cams > 4:
-        img_dir_5 = directory + "/camera_5"
-        cam5 = Thread(target=captureLoop, args=(img_dir_5, duration,interval, 8))
-        cam5.start()
-        threads.append(cam5)
-
-    # Sixth Camera
-    if num_Cams > 5:
-        img_dir_6 = directory + "/camera_6"
-        cam6 = Thread(target=captureLoop, args=(img_dir_6, duration,interval, 10))
-        cam6.start()
-        threads.append(cam6)
+    # Opens a thread for each camera with a target function of captureLoop
+    for i in range(num_Cams):
+        t = Thread(target=captureLoop, args=(f"{directory}/camera_{i+1}", duration, interval, (i * 2)))
+        t.start()
+        threads.append(t)
 
     # Join threads
     for i in threads:
         i.join()
     return print("All Pictures Taken")
+
 # --------------------------------------------------
 def captureLoop(directory, duration, interval, camera_index):
-    ''' Defines the loop to take pictures '''
+    """ Picture taking loop """
 
+    # Define the number of pictures to take and initialize which image is being taken
     images = int(duration/interval)
-    pic_time = [x * interval for x in list(range(images))]
-    count = 0
     img_num = 0
 
+    # Opens the VideoCapture object
     cap = cv2.VideoCapture(camera_index + cv2.CAP_V4L2)
-    while True:
-        ret, frame = cap.read()
 
-        if count == pic_time[img_num]:
-           _, still = cap.read()
-           file_path = directory + "/capture_" + str(img_num) + ".png"
-           cv2.imwrite(file_path, still)
+    # Save an image and wait for the interval before saving again
+    for image in range(images):
+        _, frame = cap.read()
+        file_path = f"{directory}/capture_{img_num}.png"
 
-           if img_num == (images - 1):
-               cap.release()
-               cv2.destroyAllWindows()
-               return
+        cv2.imwrite(file_path, frame)
 
-           img_num += 1
+        img_num += 1
+        time.sleep(interval)
 
-        # Wait 1 second and check conditions again
-        time.sleep(1)
-        count += 1
+    # Close the VideoCapture object
+    cap.release()
+    cv2.destroyAllWindows()
+    return
+
 # --------------------------------------------------
 def img2video(directory, camera, fps):
 
@@ -211,10 +173,12 @@ def img2video(directory, camera, fps):
         frame = cv2.imread(image)
         out.write(frame)
 
+    # Release the VideoWriter object and return
     out.release()
     cv2.destroyAllWindows()
     os.chdir('../..')
-    print("The output video is {}".format(output))
+    print(f"The output video saved as {output}")
+    return
 
 # --------------------------------------------------
 if __name__ == '__main__':
